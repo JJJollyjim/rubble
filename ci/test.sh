@@ -4,6 +4,12 @@ set -o errexit
 
 RUSTFLAGS=${RUSTFLAGS:---deny warnings}
 
+declare -A devices
+devices[51]=thumbv6m-none-eabi
+devices[52810]=thumbv7em-none-eabi
+devices[52832]=thumbv7em-none-eabi
+devices[52840]=thumbv7em-none-eabi
+
 # Run unit tests. We'd prefer to run `cargo test --all`, but some packages
 # require enabling Cargo features, which Cargo does not support in that case.
 echo "Running tests with Cargo..."
@@ -14,30 +20,50 @@ cargo test -p rubble
 (
     cd rubble-nrf5x
 
-    TARGET=thumbv7em-none-eabi
-    echo "Checking rubble-nrf5x for $TARGET..."
-    cargo check --features="52810" --target "$TARGET"
-    cargo check --features="52832" --target "$TARGET"
-    cargo check --features="52840" --target "$TARGET"
+    for DEVICE in "${!devices[@]}"
+    do
+        TARGET="${devices[$DEVICE]}"
 
-    TARGET=thumbv6m-none-eabi
-    echo "Checking rubble-nrf5x for $TARGET..."
-    cargo check --features="51" --target "$TARGET"
+        echo "Checking rubble-nrf5x for nRF$DEVICE ($TARGET)..."
+        cargo check --features="$DEVICE" --target="$TARGET"
+    done
 )
 
 # Check that the demo apps build with all supported feature combinations.
 # Here we do a proper build to also make sure linking the final binary works.
-for demo in demos/nrf52*; do
-    for device in 52810 52832 52840; do
+for demo in demos/nrf5x*; do
+    for DEVICE in "${!devices[@]}"; do
+        TARGET="${devices[$DEVICE]}"
+
         (
-            TARGET=thumbv7em-none-eabi
-            echo "Building $demo for device $device, target $TARGET..."
+            echo "Building $demo for device nRF$DEVICE, target $TARGET..."
             cd "$demo"
-            cargo build --target "$TARGET" --features "$device"
-            cargo build --target "$TARGET" --features "$device" --no-default-features
+            cargo build --target "$TARGET" --features "$DEVICE"
+            cargo build --target "$TARGET" --features "$DEVICE" --no-default-features
         )
     done
 done
+
+# Demos which only work on the nRF52... for now :)
+for demo in demos/nrf52*; do
+    for DEVICE in "${!devices[@]}"; do
+        TARGET="${devices[$DEVICE]}"
+
+        if [[ ! $DEVICE == "52"* ]]
+        then
+            echo "SKIPPING $demo for device nRF$DEVICE"
+            continue
+        done
+
+        (
+            echo "Building $demo for device nRF$DEVICE, target $TARGET..."
+            cd "$demo"
+            cargo build --target "$TARGET" --features "$DEVICE"
+            cargo build --target "$TARGET" --features "$DEVICE" --no-default-features
+        )
+    done
+done
+
 
 # Lastly, check formatting. We'd like to do this earlier, but some crates copy
 # module files around in their build scripts, so they can only be formatted once

@@ -6,6 +6,9 @@
 use panic_halt as _;
 
 // Import the right HAL and PAC
+#[cfg(feature = "51")]
+use nrf51_hal as hal;
+
 #[cfg(feature = "52810")]
 use nrf52810_hal as hal;
 
@@ -14,6 +17,12 @@ use nrf52832_hal as hal;
 
 #[cfg(feature = "52840")]
 use nrf52840_hal as hal;
+
+#[cfg(feature = "51")]
+use hal::nrf51 as target;
+
+#[cfg(not(feature = "51"))]
+use hal::target as target;
 
 use {
     byteorder::{ByteOrder, LittleEndian},
@@ -24,7 +33,7 @@ use {
     rubble_nrf5x::radio::{BleRadio, PacketBuffer},
 };
 
-#[rtfm::app(device = crate::hal::target, peripherals = true)]
+#[rtfm::app(device = crate::target, peripherals = true)]
 const APP: () = {
     struct Resources {
         #[init([0; MIN_PDU_BUF])]
@@ -33,7 +42,7 @@ const APP: () = {
         ble_rx_buf: PacketBuffer,
         radio: BleRadio,
         beacon: Beacon,
-        beacon_timer: hal::target::TIMER1,
+        beacon_timer: target::TIMER1,
     }
 
     #[init(resources = [ble_tx_buf, ble_rx_buf])]
@@ -104,7 +113,7 @@ const APP: () = {
 
         let beacon = Beacon::new(
             device_address,
-            &[AdStructure::CompleteLocalName("Rusty Beacon (nRF52)")],
+            &[AdStructure::CompleteLocalName("Rusty Beacon (nRF5x)")],
         )
         .unwrap();
 
